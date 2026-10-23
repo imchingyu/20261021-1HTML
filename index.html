@@ -1,0 +1,876 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="theme-color" content="#111614">
+	<title>課堂抽籤機</title>
+	<style>
+		:root {
+			color-scheme: dark;
+			--bg: #111614;
+			--panel: #1a211e;
+			--panel-soft: #202925;
+			--line: #35413b;
+			--text: #f3f5ef;
+			--muted: #a8b2aa;
+			--lime: #c4f06b;
+			--teal: #64d8c5;
+			--coral: #ff806f;
+			--yellow: #f4d367;
+			--radius: 8px;
+		}
+
+		* { box-sizing: border-box; }
+
+		body {
+			margin: 0;
+			min-width: 320px;
+			min-height: 100vh;
+			color: var(--text);
+			background:
+				radial-gradient(ellipse at 78% 6%, rgba(100, 216, 197, .09), transparent 31rem),
+				repeating-linear-gradient(135deg, rgba(255,255,255,.014) 0 1px, transparent 1px 11px),
+				var(--bg);
+			font-family: "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+			line-height: 1.5;
+		}
+
+		button, input, textarea { font: inherit; }
+		button { color: inherit; }
+
+		.app-shell { width: min(1500px, 100%); margin: 0 auto; padding: 24px clamp(16px, 3vw, 44px) 36px; }
+
+		.topbar {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 16px;
+			padding-bottom: 20px;
+			border-bottom: 1px solid var(--line);
+		}
+
+		.brand { display: flex; align-items: center; gap: 14px; }
+		.brand-mark {
+			display: grid;
+			width: 46px;
+			aspect-ratio: 1;
+			place-items: center;
+			border: 1px solid rgba(196,240,107,.5);
+			border-radius: 12px;
+			color: var(--lime);
+			font-size: 1.55rem;
+			font-weight: 900;
+			transform: rotate(-5deg);
+		}
+		.brand h1 { margin: 0; font-size: clamp(1.35rem, 2.3vw, 1.9rem); letter-spacing: 0; }
+		.brand p { margin: 2px 0 0; color: var(--muted); font-size: .92rem; }
+
+		.top-actions { display: flex; align-items: center; gap: 12px; }
+		.status-chip { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .9rem; }
+		.status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 12px rgba(196,240,107,.55); }
+		.icon-button {
+			display: grid;
+			width: 46px;
+			height: 46px;
+			place-items: center;
+			border: 1px solid var(--line);
+			border-radius: var(--radius);
+			background: var(--panel);
+			color: var(--muted);
+			cursor: pointer;
+			transition: color .18s, border-color .18s, background .18s;
+		}
+		.icon-button:hover { color: var(--text); border-color: var(--teal); background: var(--panel-soft); }
+		.icon-button svg { width: 21px; height: 21px; }
+
+		main { padding-top: 24px; }
+		.workspace { display: grid; grid-template-columns: minmax(310px, 390px) minmax(0, 1fr); gap: 22px; align-items: stretch; }
+
+		.setup-panel, .draw-panel, .history-panel { border: 1px solid var(--line); border-radius: var(--radius); background: rgba(26,33,30,.94); }
+		.setup-panel { padding: clamp(18px, 2.2vw, 28px); }
+		.section-kicker { margin: 0 0 6px; color: var(--teal); font-size: .8rem; font-weight: 800; letter-spacing: .08em; }
+		h2 { margin: 0; font-size: 1.22rem; letter-spacing: 0; }
+		.section-heading { margin-bottom: 22px; }
+
+		.mode-switch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 5px; border: 1px solid var(--line); border-radius: var(--radius); background: #131917; }
+		.mode-button {
+			min-height: 48px;
+			border: 0;
+			border-radius: 5px;
+			background: transparent;
+			color: var(--muted);
+			font-weight: 800;
+			cursor: pointer;
+		}
+		.mode-button[aria-pressed="true"] { background: var(--panel-soft); color: var(--lime); box-shadow: inset 0 0 0 1px #46543e; }
+
+		.field-group { margin-top: 21px; }
+		.field-label { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; font-weight: 800; }
+		.field-hint { color: var(--muted); font-size: .82rem; font-weight: 400; }
+		.range-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+		.range-fields label { display: grid; gap: 5px; color: var(--muted); font-size: .84rem; }
+		input[type="number"], textarea, input[type="text"] {
+			width: 100%;
+			border: 1px solid #46524b;
+			border-radius: 6px;
+			outline: none;
+			background: #121816;
+			color: var(--text);
+			transition: border-color .16s, box-shadow .16s;
+		}
+		input[type="number"], input[type="text"] { min-height: 48px; padding: 9px 12px; }
+		textarea { min-height: 154px; padding: 12px; resize: vertical; line-height: 1.6; }
+		input:focus, textarea:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(100,216,197,.13); }
+		.hidden { display: none !important; }
+
+		.count-row { display: grid; grid-template-columns: minmax(0, 1fr) 112px; gap: 14px; align-items: center; }
+		.count-control { display: flex; align-items: center; height: 48px; border: 1px solid #46524b; border-radius: 6px; background: #121816; }
+		.step-button { width: 42px; height: 100%; border: 0; background: transparent; color: var(--teal); font-size: 1.35rem; cursor: pointer; }
+		.step-button:hover { background: var(--panel-soft); }
+		.count-control input { min-width: 0; height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; text-align: center; font-size: 1.15rem; font-weight: 800; box-shadow: none; }
+		.count-control input::-webkit-inner-spin-button { opacity: 1; }
+
+		.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 21px; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+		.toggle-copy strong { display: block; font-size: .98rem; }
+		.toggle-copy span { color: var(--muted); font-size: .82rem; }
+		.toggle { position: relative; flex: 0 0 auto; width: 56px; height: 32px; }
+		.toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+		.toggle-track { position: absolute; inset: 0; border: 1px solid #58645d; border-radius: 20px; background: #303a34; cursor: pointer; transition: background .18s, border-color .18s; }
+		.toggle-track::after { position: absolute; top: 4px; left: 4px; width: 22px; height: 22px; border-radius: 50%; background: #d5dbd5; content: ""; transition: transform .18s, background .18s; }
+		.toggle input:checked + .toggle-track { border-color: var(--lime); background: #526b31; }
+		.toggle input:checked + .toggle-track::after { transform: translateX(24px); background: var(--lime); }
+		.toggle input:focus-visible + .toggle-track { outline: 3px solid rgba(100,216,197,.4); outline-offset: 2px; }
+
+		.remaining-line { min-height: 24px; margin: 9px 0 0; color: var(--muted); font-size: .88rem; }
+		.remaining-line strong { color: var(--lime); font-size: 1rem; }
+		.exclude-input { min-height: 48px; }
+
+		.draw-panel { position: relative; display: flex; min-height: 552px; flex-direction: column; overflow: hidden; padding: clamp(20px, 3vw, 38px); background: radial-gradient(ellipse at 50% 43%, rgba(100,216,197,.09), transparent 55%), #171e1b; }
+		.draw-panel::before, .draw-panel::after { position: absolute; width: 210px; height: 1px; background: var(--line); content: ""; }
+		.draw-panel::before { top: 26px; left: 26px; }
+		.draw-panel::after { right: 26px; bottom: 26px; }
+		.draw-topline { display: flex; justify-content: space-between; gap: 14px; color: var(--muted); font-size: .88rem; }
+		.draw-topline strong { color: var(--text); }
+		.stage { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; min-height: 360px; text-align: center; }
+		.stage-label { margin: 0 0 16px; color: var(--teal); font-size: .9rem; font-weight: 800; letter-spacing: .08em; }
+		.result-list { display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(10px, 2vw, 22px); width: 100%; }
+		.result-item {
+			display: grid;
+			min-width: clamp(120px, 15vw, 210px);
+			min-height: clamp(120px, 15vw, 210px);
+			max-width: 100%;
+			aspect-ratio: 1;
+			place-items: center;
+			padding: 12px;
+			overflow-wrap: anywhere;
+			border: 2px solid rgba(196,240,107,.78);
+			border-radius: 50%;
+			background: radial-gradient(circle at 35% 28%, #344332, #1a241d 72%);
+			color: var(--lime);
+			font-size: clamp(2.7rem, 7vw, 6.4rem);
+			font-weight: 900;
+			line-height: 1.08;
+			text-shadow: 0 0 26px rgba(196,240,107,.22);
+			box-shadow: 0 0 0 8px rgba(196,240,107,.035), 0 12px 40px rgba(0,0,0,.2);
+		}
+		.result-item.name-result { min-width: clamp(150px, 20vw, 245px); min-height: clamp(110px, 13vw, 175px); aspect-ratio: 1.35; border-radius: 28px; font-size: clamp(1.8rem, 4vw, 3.7rem); }
+		.stage-placeholder { color: #76827a; font-size: clamp(1.15rem, 2.2vw, 1.65rem); }
+		.stage-placeholder span { display: block; margin-bottom: 9px; color: #a5afa8; font-size: 3rem; }
+		.drawing .result-item { animation: shuffle .16s linear infinite alternate; }
+		.drawing .result-item:nth-child(even) { animation-delay: .08s; }
+		@keyframes shuffle { from { transform: translateY(-5px) rotate(-2deg); } to { transform: translateY(5px) rotate(2deg); } }
+		.draw-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px; }
+		.draw-button { display: inline-flex; min-width: min(330px, 100%); min-height: 72px; align-items: center; justify-content: center; gap: 12px; padding: 12px 28px; border: 0; border-radius: 7px; background: var(--lime); color: #172012; font-size: clamp(1.35rem, 2.7vw, 1.85rem); font-weight: 900; cursor: pointer; box-shadow: 0 7px 0 #7e9f3f; transition: transform .12s, box-shadow .12s, filter .12s; }
+		.draw-button:hover:not(:disabled) { filter: brightness(1.07); transform: translateY(-2px); box-shadow: 0 9px 0 #7e9f3f; }
+		.draw-button:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 3px 0 #7e9f3f; }
+		.draw-button:disabled { cursor: wait; opacity: .72; }
+		.draw-button svg { width: 26px; height: 26px; }
+		.error-message { min-height: 26px; margin: 15px 0 0; color: var(--coral); font-size: .98rem; font-weight: 700; text-align: center; }
+		.group-options { display: grid; gap: 14px; }
+		.group-size-row { display: grid; grid-template-columns: 1fr 112px; gap: 14px; align-items: center; }
+		.group-methods { display: grid; gap: 8px; }
+		.group-method {
+			display: flex;
+			min-height: 44px;
+			align-items: center;
+			gap: 9px;
+			padding: 8px 10px;
+			border: 1px solid var(--line);
+			border-radius: 6px;
+			color: var(--muted);
+			cursor: pointer;
+		}
+		.group-method:has(input:checked) { border-color: var(--teal); color: var(--text); background: rgba(100,216,197,.08); }
+		.group-method input { accent-color: var(--teal); }
+		.group-method strong { color: inherit; }
+		.group-method span { font-size: .82rem; }
+		.group-results { display: grid; width: 100%; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 14px; align-content: start; text-align: left; }
+		.group-card { min-width: 0; padding: 16px; border: 1px solid #48554d; border-radius: 8px; background: #1b2520; box-shadow: 0 8px 24px rgba(0,0,0,.16); }
+		.group-card-header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+		.group-card-header h3 { margin: 0; color: var(--teal); font-size: 1.05rem; }
+		.group-card-header span { color: var(--muted); font-size: .82rem; }
+		.group-members { display: grid; gap: 8px; margin: 12px 0 16px; padding: 0; list-style: none; }
+		.group-member { overflow-wrap: anywhere; padding: 7px 9px; border-radius: 5px; background: #141b17; }
+		.group-member.is-leader { border: 1px solid var(--yellow); background: rgba(244,211,103,.12); color: var(--yellow); font-weight: 900; }
+		.leader-badge { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 3px; background: var(--yellow); color: #211c0c; font-size: .72rem; vertical-align: 2px; }
+		.leader-button { width: 100%; min-height: 40px; padding: 7px 10px; border: 1px solid #64734f; border-radius: 5px; background: #293522; color: var(--lime); font-weight: 800; cursor: pointer; }
+		.leader-button:hover { border-color: var(--lime); background: #34432a; }
+		.leader-button:disabled { cursor: default; opacity: .6; }
+		.draw-button.secondary { min-width: min(330px, 100%); min-height: 54px; padding: 9px 18px; background: var(--teal); color: #10201c; font-size: 1rem; box-shadow: 0 5px 0 #388c7e; }
+		.draw-button.secondary:hover:not(:disabled) { box-shadow: 0 7px 0 #388c7e; }
+		.draw-button.secondary:active:not(:disabled) { box-shadow: 0 2px 0 #388c7e; }
+
+		.history-panel { margin-top: 22px; padding: 22px clamp(18px, 2.2vw, 28px); }
+		.history-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+		.history-title { display: flex; align-items: center; gap: 11px; }
+		.history-count { display: grid; min-width: 30px; height: 30px; place-items: center; padding: 0 8px; border: 1px solid #58644b; border-radius: 20px; color: var(--lime); font-size: .83rem; font-weight: 800; }
+		.text-button { display: inline-flex; align-items: center; gap: 7px; min-height: 42px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: #d1d8d1; font-weight: 700; cursor: pointer; }
+		.text-button:hover { border-color: var(--coral); color: var(--coral); }
+		.text-button svg { width: 18px; height: 18px; }
+		.history-list { display: grid; gap: 9px; max-height: 280px; overflow-y: auto; padding: 14px 2px 2px; }
+		.history-empty { margin: 0; padding: 14px 0; color: var(--muted); text-align: center; }
+		.history-entry { display: grid; grid-template-columns: minmax(86px, auto) 1fr; gap: 14px; padding: 12px 14px; border-left: 3px solid var(--teal); background: #151b18; }
+		.history-time { color: var(--muted); font-size: .84rem; white-space: nowrap; }
+		.history-names { overflow-wrap: anywhere; font-size: 1.05rem; font-weight: 800; }
+		.confetti-layer { position: fixed; z-index: 5; inset: 0; overflow: hidden; pointer-events: none; }
+		.confetti { position: absolute; top: -18px; width: 10px; height: 17px; animation: confetti-fall 2.4s ease-in forwards; }
+		@keyframes confetti-fall { to { transform: translate3d(var(--drift), 110vh, 0) rotate(760deg); opacity: .1; } }
+		.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+		@media (max-width: 850px) {
+			.workspace { grid-template-columns: 1fr; }
+			.draw-panel { min-height: 500px; }
+			.setup-panel { order: 2; }
+			.draw-panel { order: 1; }
+			.history-panel { margin-top: 18px; }
+			.result-item { min-width: clamp(110px, 24vw, 180px); min-height: clamp(110px, 24vw, 180px); }
+		}
+		@media (max-width: 520px) {
+			.app-shell { padding: 14px 12px 24px; }
+			.topbar { align-items: flex-start; }
+			.brand { gap: 10px; }
+			.brand-mark { width: 40px; border-radius: 10px; }
+			.brand p { font-size: .78rem; }
+			.status-chip { display: none; }
+			main { padding-top: 14px; }
+			.draw-panel { min-height: 425px; padding: 22px 14px; }
+			.draw-panel::before { top: 15px; left: 15px; width: 80px; }
+			.draw-panel::after { right: 15px; bottom: 15px; width: 80px; }
+			.draw-topline { font-size: .78rem; }
+			.stage { min-height: 285px; }
+			.result-list { gap: 9px; }
+			.result-item { min-width: min(39vw, 155px); min-height: min(39vw, 155px); font-size: clamp(2.5rem, 12vw, 4.2rem); }
+			.result-item.name-result { min-width: min(42vw, 185px); min-height: 95px; font-size: clamp(1.6rem, 7vw, 2.6rem); }
+			.draw-button { min-height: 64px; }
+			.history-entry { grid-template-columns: 1fr; gap: 4px; }
+			.history-time { font-size: .78rem; }
+		}
+		@media (prefers-reduced-motion: reduce) {
+			*, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+		}
+	</style>
+</head>
+<body>
+	<div class="confetti-layer" id="confettiLayer" aria-hidden="true"></div>
+	<div class="app-shell">
+		<header class="topbar">
+			<div class="brand">
+				<div class="brand-mark" aria-hidden="true">抽</div>
+				<div>
+					<h1>課堂抽籤機</h1>
+					<p>把下一個精彩時刻，交給一點好運</p>
+				</div>
+			</div>
+			<div class="top-actions">
+				<div class="status-chip"><span class="status-dot" aria-hidden="true"></span><span>名單自動儲存</span></div>
+				<button class="icon-button" id="resetButton" type="button" aria-label="重置抽籤紀錄" title="重置抽籤紀錄">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+				</button>
+			</div>
+		</header>
+
+		<main>
+			<div class="workspace">
+				<section class="setup-panel" aria-labelledby="setupTitle">
+					<div class="section-heading">
+						<p class="section-kicker">DRAW SETTINGS</p>
+						<h2 id="setupTitle">抽籤設定</h2>
+					</div>
+
+					<div class="mode-switch" role="group" aria-label="抽籤模式">
+						<button class="mode-button" id="numberModeButton" type="button" aria-pressed="true">號碼模式</button>
+						<button class="mode-button" id="nameModeButton" type="button" aria-pressed="false">姓名模式</button>
+						<button class="mode-button" id="groupModeButton" type="button" aria-pressed="false">隨機分組</button>
+					</div>
+
+					<div id="numberFields" class="field-group">
+						<div class="field-label"><span>號碼範圍</span><span class="field-hint">包含起號與迄號</span></div>
+						<div class="range-fields">
+							<label>從<input id="startNumber" type="number" value="1" min="1" step="1" inputmode="numeric" aria-label="起始號碼"></label>
+							<label>到<input id="endNumber" type="number" value="30" min="1" step="1" inputmode="numeric" aria-label="結束號碼"></label>
+						</div>
+					</div>
+
+					<div id="nameFields" class="field-group hidden">
+						<label class="field-label" for="nameList"><span>學生名單</span><span class="field-hint">每行一個姓名</span></label>
+						<textarea id="nameList" placeholder="王小明&#10;陳怡君&#10;林家豪" spellcheck="false"></textarea>
+					</div>
+
+					<div id="groupFields" class="field-group hidden">
+						<label class="field-label" for="groupSize"><span>隨機分組名單</span><span class="field-hint">每行一位；性別分組請標示 (男) 或 (女)</span></label>
+						<textarea id="groupRoster" placeholder="王小明 (男)&#10;陳怡君 (女)&#10;林家豪 (男)" spellcheck="false"></textarea>
+						<div class="group-options field-group">
+							<div>
+								<label class="field-label" for="groupSize"><span>每組人數</span><span class="field-hint">最後一組可不足額</span></label>
+								<input id="groupSize" type="number" value="4" min="1" step="1" inputmode="numeric" aria-label="每組人數">
+							</div>
+							<div>
+								<span class="field-label">分組方式</span>
+								<div class="group-methods" role="radiogroup" aria-label="分組方式">
+									<label class="group-method"><input type="radio" name="groupMethod" value="random" checked><strong>純隨機</strong></label>
+									<label class="group-method"><input type="radio" name="groupMethod" value="mixed"><strong>男女混合</strong><span>男女盡量平均分配</span></label>
+									<label class="group-method"><input type="radio" name="groupMethod" value="separate"><strong>男女分開</strong></label>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div class="field-group" id="drawCountFields">
+						<label class="field-label" for="drawCount"><span>每次抽出</span><span class="field-hint">可一次抽多位</span></label>
+						<div class="count-row">
+							<div class="toggle-copy"><strong>抽出人數</strong><span>每次要抽幾位？</span></div>
+							<div class="count-control">
+								<button class="step-button" id="decreaseCount" type="button" aria-label="減少抽出人數">−</button>
+								<input id="drawCount" type="number" value="1" min="1" step="1" inputmode="numeric" aria-label="每次抽出人數">
+								<button class="step-button" id="increaseCount" type="button" aria-label="增加抽出人數">+</button>
+							</div>
+						</div>
+					</div>
+
+					<div class="toggle-row" id="noRepeatRow">
+						<div class="toggle-copy"><strong>不重複抽籤</strong><span>已抽過的對象不再出現</span></div>
+						<label class="toggle" aria-label="不重複抽籤">
+							<input id="noRepeat" type="checkbox" checked>
+							<span class="toggle-track"></span>
+						</label>
+					</div>
+					<p class="remaining-line" id="remainingLine" aria-live="polite">剩餘可抽：<strong>30</strong> 人</p>
+
+					<div class="field-group" id="excludeFields">
+						<label class="field-label" for="excludeInput"><span>排除對象</span><span class="field-hint">逗號或換行分隔</span></label>
+						<input class="exclude-input" id="excludeInput" type="text" placeholder="例如：5, 12" autocomplete="off">
+					</div>
+				</section>
+
+				<section class="draw-panel" id="drawPanel" aria-labelledby="drawHeading">
+					<div class="draw-topline"><span id="drawHeading"><strong>NOW DRAWING</strong> / 課堂幸運時刻</span><span id="poolLabel">號碼 1–30</span></div>
+					<div class="stage" id="stage" aria-live="polite" aria-atomic="true">
+						<p class="stage-placeholder"><span aria-hidden="true">✳</span>準備好就開始抽籤</p>
+					</div>
+					<div class="draw-actions">
+						<button class="draw-button" id="drawButton" type="button">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3Z"/><path d="m19 14 1.1 3.1L23 18l-2.9 1L19 22l-1.1-3-2.9-1 2.9-.9L19 14Z"/></svg>
+							開始抽籤
+						</button>
+						<button class="draw-button secondary hidden" id="allLeadersButton" type="button">每組各抽一位組長</button>
+					</div>
+					<p class="error-message" id="errorMessage" role="alert"></p>
+				</section>
+			</div>
+
+			<section class="history-panel" aria-labelledby="historyTitle">
+				<div class="history-header">
+					<div class="history-title"><h2 id="historyTitle">抽籤紀錄</h2><span class="history-count" id="historyCount">0</span></div>
+					<button class="text-button" id="clearHistoryButton" type="button">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-.8 14H5.8L5 6m4 4v6m6-6v6"/></svg>
+						重置紀錄
+					</button>
+				</div>
+				<div class="history-list" id="historyList" aria-live="polite"><p class="history-empty">尚無抽籤紀錄</p></div>
+			</section>
+		</main>
+	</div>
+
+	<script>
+		(() => {
+			const STORAGE_KEY = "classroom-lottery-roster-v1";
+			const GROUP_STORAGE_KEY = "classroom-lottery-group-roster-v1";
+			const numberModeButton = document.getElementById("numberModeButton");
+			const nameModeButton = document.getElementById("nameModeButton");
+			const groupModeButton = document.getElementById("groupModeButton");
+			const numberFields = document.getElementById("numberFields");
+			const nameFields = document.getElementById("nameFields");
+			const groupFields = document.getElementById("groupFields");
+			const startNumber = document.getElementById("startNumber");
+			const endNumber = document.getElementById("endNumber");
+			const nameList = document.getElementById("nameList");
+			const groupRoster = document.getElementById("groupRoster");
+			const groupSize = document.getElementById("groupSize");
+			const drawCount = document.getElementById("drawCount");
+			const drawCountFields = document.getElementById("drawCountFields");
+			const noRepeat = document.getElementById("noRepeat");
+			const noRepeatRow = document.getElementById("noRepeatRow");
+			const excludeInput = document.getElementById("excludeInput");
+			const excludeFields = document.getElementById("excludeFields");
+			const remainingLine = document.getElementById("remainingLine");
+			const poolLabel = document.getElementById("poolLabel");
+			const stage = document.getElementById("stage");
+			const drawPanel = document.getElementById("drawPanel");
+			const drawButton = document.getElementById("drawButton");
+			const allLeadersButton = document.getElementById("allLeadersButton");
+			const errorMessage = document.getElementById("errorMessage");
+			const historyList = document.getElementById("historyList");
+			const historyCount = document.getElementById("historyCount");
+			const confettiLayer = document.getElementById("confettiLayer");
+			let mode = "number";
+			let drawn = new Set();
+			let history = [];
+			let groups = [];
+			let groupLeaders = [];
+			let isDrawing = false;
+			let audioContext;
+
+			try {
+				nameList.value = localStorage.getItem(STORAGE_KEY) || "";
+				groupRoster.value = localStorage.getItem(GROUP_STORAGE_KEY) || nameList.value;
+			} catch (error) {
+				nameList.value = "";
+				groupRoster.value = "";
+			}
+
+			function getParticipants() {
+				if (mode === "name") {
+					return nameList.value.split(/\r?\n/).map((name) => name.trim()).filter(Boolean);
+				}
+				if (mode === "group") {
+					return groupRoster.value.split(/\r?\n/).map((name) => name.trim()).filter(Boolean);
+				}
+
+				const start = Number(startNumber.value);
+				const end = Number(endNumber.value);
+				if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start) return [];
+				const size = end - start + 1;
+				if (size > 10000) return [];
+				return Array.from({ length: size }, (_, index) => String(start + index));
+			}
+
+			function getExcluded() {
+				return new Set(excludeInput.value.split(/[\s,，、;；]+/).map((item) => item.trim()).filter(Boolean));
+			}
+
+			function getEligible() {
+				const excluded = getExcluded();
+				return getParticipants().filter((person) => !excluded.has(person));
+			}
+
+			function updateSummary() {
+				const people = getParticipants();
+				const eligible = getEligible();
+				const available = eligible.filter((person) => !drawn.has(person));
+				if (mode === "number") {
+					const start = startNumber.value || "?";
+					const end = endNumber.value || "?";
+					poolLabel.textContent = `號碼 ${start}–${end}`;
+				} else if (mode === "group") {
+					poolLabel.textContent = `分組名單 ${people.length} 人`;
+				} else {
+					poolLabel.textContent = `名單 ${people.length} 人`;
+				}
+				remainingLine.classList.toggle("hidden", mode === "group");
+				remainingLine.innerHTML = noRepeat.checked
+					? `剩餘可抽：<strong>${available.length}</strong> 人`
+					: `符合條件：<strong>${eligible.length}</strong> 人`;
+			}
+
+			function setMode(nextMode) {
+				mode = nextMode;
+				const isNumberMode = mode === "number";
+				const isNameMode = mode === "name";
+				const isGroupMode = mode === "group";
+				numberFields.classList.toggle("hidden", !isNumberMode);
+				nameFields.classList.toggle("hidden", !isNameMode);
+				groupFields.classList.toggle("hidden", !isGroupMode);
+				drawCountFields.classList.toggle("hidden", isGroupMode);
+				noRepeatRow.classList.toggle("hidden", isGroupMode);
+				excludeFields.classList.toggle("hidden", isGroupMode);
+				numberModeButton.setAttribute("aria-pressed", String(isNumberMode));
+				nameModeButton.setAttribute("aria-pressed", String(isNameMode));
+				groupModeButton.setAttribute("aria-pressed", String(isGroupMode));
+				drawButton.lastChild.textContent = isGroupMode ? "開始分組" : "開始抽籤";
+				allLeadersButton.classList.toggle("hidden", !isGroupMode || groups.length === 0);
+				excludeInput.placeholder = isNumberMode ? "例如：5, 12" : "例如：王小明, 陳怡君";
+				clearError();
+				updateSummary();
+			}
+
+			function clearError() { errorMessage.textContent = ""; }
+
+			function showResults(people) {
+				stage.replaceChildren();
+				const label = document.createElement("p");
+				label.className = "stage-label";
+				label.textContent = "本次抽中";
+				const results = document.createElement("div");
+				results.className = "result-list";
+				people.forEach((person) => {
+					const item = document.createElement("div");
+					item.className = `result-item${mode === "name" ? " name-result" : ""}`;
+					item.textContent = person;
+					results.append(item);
+				});
+				stage.append(label, results);
+			}
+
+			function shuffle(people) {
+				const result = people.slice();
+				for (let index = result.length - 1; index > 0; index -= 1) {
+					const swapIndex = Math.floor(Math.random() * (index + 1));
+					[result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+				}
+				return result;
+			}
+
+			function addHistory(people) {
+				const timestamp = new Date();
+				history.push({
+					iso: timestamp.toISOString(),
+					label: timestamp.toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }),
+					people
+				});
+				renderHistory();
+			}
+
+			function getGroupedRoster() {
+				const lines = groupRoster.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+				return lines.map((display) => {
+					const match = display.match(/^(.*?)\s*[（(]\s*(男|女)\s*[）)]$/);
+					return { display, gender: match ? match[2] : "" };
+				});
+			}
+
+			function distributeMixed(people, capacities) {
+				const result = capacities.map(() => []);
+				const genders = ["男", "女"];
+				if (Math.random() < 0.5) genders.reverse();
+				genders.forEach((gender) => {
+					const members = shuffle(people.filter((person) => person.gender === gender));
+					members.forEach((person) => {
+						const available = result.map((membersInGroup, index) => ({ membersInGroup, index }))
+							.filter((group) => group.membersInGroup.length < capacities[group.index]);
+						available.sort((first, second) => {
+							const firstGenderCount = first.membersInGroup.filter((member) => member.gender === gender).length;
+							const secondGenderCount = second.membersInGroup.filter((member) => member.gender === gender).length;
+							return firstGenderCount - secondGenderCount || first.membersInGroup.length - second.membersInGroup.length;
+						});
+						if (available.length) result[available[0].index].push(person);
+					});
+				});
+				return result;
+			}
+
+			function renderGroups() {
+				stage.replaceChildren();
+				const label = document.createElement("p");
+				label.className = "stage-label";
+				label.textContent = "分組結果";
+				const results = document.createElement("div");
+				results.className = "group-results";
+				groups.forEach((members, groupIndex) => {
+					const card = document.createElement("article");
+					card.className = "group-card";
+					const header = document.createElement("div");
+					header.className = "group-card-header";
+					const title = document.createElement("h3");
+					title.textContent = `第 ${groupIndex + 1} 組`;
+					const count = document.createElement("span");
+					count.textContent = `${members.length} 人`;
+					header.append(title, count);
+					const list = document.createElement("ul");
+					list.className = "group-members";
+					members.forEach((person, memberIndex) => {
+						const item = document.createElement("li");
+						item.className = `group-member${groupLeaders[groupIndex] === memberIndex ? " is-leader" : ""}`;
+						item.textContent = person.display;
+						if (groupLeaders[groupIndex] === memberIndex) {
+							const badge = document.createElement("span");
+							badge.className = "leader-badge";
+							badge.textContent = "組長";
+							item.append(badge);
+						}
+						list.append(item);
+					});
+					const button = document.createElement("button");
+					button.className = "leader-button";
+					button.type = "button";
+					button.dataset.groupIndex = String(groupIndex);
+					button.textContent = groupLeaders[groupIndex] === null ? "抽出本組組長" : "重抽本組組長";
+					card.append(header, list, button);
+					results.append(card);
+				});
+				stage.append(label, results);
+			}
+
+			function createGroups() {
+				clearError();
+				const roster = getGroupedRoster();
+				const size = Number(groupSize.value);
+				const method = document.querySelector('input[name="groupMethod"]:checked').value;
+				if (!roster.length) {
+					errorMessage.textContent = "請先輸入學生名單。";
+					groupRoster.focus();
+					return;
+				}
+				if (!Number.isInteger(size) || size < 1) {
+					errorMessage.textContent = "每組人數請輸入至少 1 人。";
+					groupSize.focus();
+					return;
+				}
+				if (method !== "random" && roster.some((person) => !person.gender)) {
+					errorMessage.textContent = "男女分組需要每位同學都標示性別，例如：王小明 (男)。";
+					groupRoster.focus();
+					return;
+				}
+
+				if (method === "separate") {
+					groups = [];
+					["男", "女"].forEach((gender) => {
+						const members = shuffle(roster.filter((person) => person.gender === gender));
+						for (let index = 0; index < members.length; index += size) groups.push(members.slice(index, index + size));
+					});
+				} else if (method === "mixed") {
+					const groupCount = Math.ceil(roster.length / size);
+					const baseSize = Math.floor(roster.length / groupCount);
+					const remainder = roster.length % groupCount;
+					const capacities = Array.from({ length: groupCount }, (_, index) => baseSize + (index < remainder ? 1 : 0));
+					groups = distributeMixed(roster, capacities);
+				} else {
+					const shuffled = shuffle(roster);
+					groups = [];
+					for (let index = 0; index < shuffled.length; index += size) groups.push(shuffled.slice(index, index + size));
+				}
+				groupLeaders = groups.map(() => null);
+				renderGroups();
+				allLeadersButton.classList.remove("hidden");
+				addHistory(groups.map((members, index) => `第 ${index + 1} 組：${members.map((person) => person.display).join("、")}`));
+				playSound();
+				launchConfetti();
+			}
+
+			function drawLeader(groupIndex) {
+				if (!groups[groupIndex]?.length) return;
+				groupLeaders[groupIndex] = Math.floor(Math.random() * groups[groupIndex].length);
+				renderGroups();
+				const leader = groups[groupIndex][groupLeaders[groupIndex]].display;
+				addHistory([`第 ${groupIndex + 1} 組組長：${leader}`]);
+				playSound();
+			}
+
+			function drawAllLeaders() {
+				if (!groups.length) return;
+				groupLeaders = groups.map((members) => Math.floor(Math.random() * members.length));
+				renderGroups();
+				addHistory(groupLeaders.map((memberIndex, groupIndex) => `第 ${groupIndex + 1} 組組長：${groups[groupIndex][memberIndex].display}`));
+				playSound();
+				launchConfetti();
+			}
+
+			function showShuffle(eligible, count) {
+				stage.replaceChildren();
+				const label = document.createElement("p");
+				label.className = "stage-label";
+				label.textContent = "幸運名單正在揭曉…";
+				const results = document.createElement("div");
+				results.className = "result-list";
+				for (let index = 0; index < count; index += 1) {
+					const item = document.createElement("div");
+					item.className = `result-item${mode === "name" ? " name-result" : ""}`;
+					item.dataset.slot = String(index);
+					results.append(item);
+				}
+				stage.append(label, results);
+				drawPanel.classList.add("drawing");
+				let tick = 0;
+				const timer = window.setInterval(() => {
+					results.querySelectorAll(".result-item").forEach((item) => {
+						item.textContent = eligible[Math.floor(Math.random() * eligible.length)];
+					});
+					tick += 1;
+					if (tick >= 12) window.clearInterval(timer);
+				}, 160);
+			}
+
+			function playSound() {
+				try {
+					audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+					if (audioContext.state === "suspended") audioContext.resume();
+					const now = audioContext.currentTime;
+					[659.25, 830.61, 987.77, 1318.51].forEach((frequency, index) => {
+						const oscillator = audioContext.createOscillator();
+						const gain = audioContext.createGain();
+						const startAt = now + index * 0.11;
+						oscillator.type = "sine";
+						oscillator.frequency.setValueAtTime(frequency, startAt);
+						gain.gain.setValueAtTime(0.0001, startAt);
+						gain.gain.exponentialRampToValueAtTime(0.16, startAt + 0.025);
+						gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.42);
+						oscillator.connect(gain);
+						gain.connect(audioContext.destination);
+						oscillator.start(startAt);
+						oscillator.stop(startAt + 0.44);
+					});
+				} catch (error) {
+					// Audio may be unavailable; the draw still completes normally.
+				}
+			}
+
+			function prepareAudio() {
+				try {
+					audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+					if (audioContext.state === "suspended") audioContext.resume();
+				} catch (error) {
+					// Audio may be unavailable; the draw still completes normally.
+				}
+			}
+
+			function launchConfetti() {
+				const colors = ["#c4f06b", "#64d8c5", "#ff806f", "#f4d367", "#f3f5ef"];
+				confettiLayer.replaceChildren();
+				for (let index = 0; index < 90; index += 1) {
+					const piece = document.createElement("span");
+					piece.className = "confetti";
+					piece.style.left = `${Math.random() * 100}%`;
+					piece.style.backgroundColor = colors[index % colors.length];
+					piece.style.setProperty("--drift", `${Math.round(Math.random() * 260 - 130)}px`);
+					piece.style.animationDelay = `${Math.random() * 0.45}s`;
+					piece.style.transform = `rotate(${Math.round(Math.random() * 180)}deg)`;
+					confettiLayer.append(piece);
+				}
+				window.setTimeout(() => confettiLayer.replaceChildren(), 3200);
+			}
+
+			function renderHistory() {
+				historyCount.textContent = String(history.length);
+				historyList.replaceChildren();
+				if (history.length === 0) {
+					const empty = document.createElement("p");
+					empty.className = "history-empty";
+					empty.textContent = "尚無抽籤紀錄";
+					historyList.append(empty);
+					return;
+				}
+				history.slice().reverse().forEach((entry) => {
+					const row = document.createElement("div");
+					row.className = "history-entry";
+					const time = document.createElement("time");
+					time.className = "history-time";
+					time.dateTime = entry.iso;
+					time.textContent = entry.label;
+					const names = document.createElement("div");
+					names.className = "history-names";
+					names.textContent = entry.people.join("、");
+					row.append(time, names);
+					historyList.append(row);
+				});
+			}
+
+			function draw() {
+				if (isDrawing) return;
+				clearError();
+				if (mode === "group") {
+					createGroups();
+					return;
+				}
+				const rawCount = Number(drawCount.value);
+				if (!Number.isInteger(rawCount) || rawCount < 1) {
+					errorMessage.textContent = "請輸入至少 1 位的抽出人數。";
+					drawCount.focus();
+					return;
+				}
+				const eligible = getEligible();
+				const pool = noRepeat.checked ? eligible.filter((person) => !drawn.has(person)) : eligible;
+				if (pool.length === 0) {
+					errorMessage.textContent = eligible.length === 0 ? "目前沒有可抽對象，請檢查名單、號碼範圍或排除設定。" : "所有符合條件的對象都已抽過，請重置紀錄或關閉不重複抽籤。";
+					return;
+				}
+				if (rawCount > pool.length) {
+					errorMessage.textContent = `人數不足：目前可抽 ${pool.length} 人，無法抽出 ${rawCount} 人。`;
+					return;
+				}
+
+				const shuffled = pool.slice();
+				for (let index = shuffled.length - 1; index > 0; index -= 1) {
+					const swapIndex = Math.floor(Math.random() * (index + 1));
+					[shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+				}
+				const winners = shuffled.slice(0, rawCount);
+				isDrawing = true;
+				drawButton.disabled = true;
+				prepareAudio();
+				showShuffle(pool, rawCount);
+				window.setTimeout(() => {
+					drawPanel.classList.remove("drawing");
+					showResults(winners);
+					if (noRepeat.checked) winners.forEach((person) => drawn.add(person));
+					addHistory(winners);
+					updateSummary();
+					playSound();
+					launchConfetti();
+					isDrawing = false;
+					drawButton.disabled = false;
+					drawButton.focus();
+				}, 2000);
+			}
+
+			function resetDraws() {
+				if (isDrawing) return;
+				drawn.clear();
+				history = [];
+				groups = [];
+				groupLeaders = [];
+				clearError();
+				stage.innerHTML = '<p class="stage-placeholder"><span aria-hidden="true">✳</span>準備好就開始抽籤</p>';
+				allLeadersButton.classList.add("hidden");
+				confettiLayer.replaceChildren();
+				renderHistory();
+				updateSummary();
+			}
+
+			numberModeButton.addEventListener("click", () => setMode("number"));
+			nameModeButton.addEventListener("click", () => setMode("name"));
+			groupModeButton.addEventListener("click", () => setMode("group"));
+			[startNumber, endNumber, excludeInput].forEach((input) => input.addEventListener("input", updateSummary));
+			nameList.addEventListener("input", () => {
+				try { localStorage.setItem(STORAGE_KEY, nameList.value); } catch (error) { /* Storage may be unavailable in private browsing. */ }
+				updateSummary();
+			});
+			groupRoster.addEventListener("input", () => {
+				try { localStorage.setItem(GROUP_STORAGE_KEY, groupRoster.value); } catch (error) { /* Storage may be unavailable in private browsing. */ }
+				updateSummary();
+			});
+			noRepeat.addEventListener("change", updateSummary);
+			drawCount.addEventListener("change", () => {
+				const value = Number(drawCount.value);
+				if (!Number.isInteger(value) || value < 1) drawCount.value = "1";
+			});
+			document.getElementById("decreaseCount").addEventListener("click", () => {
+				drawCount.value = String(Math.max(1, (Number(drawCount.value) || 1) - 1));
+			});
+			document.getElementById("increaseCount").addEventListener("click", () => {
+				drawCount.value = String(Math.max(1, Number(drawCount.value) || 1) + 1);
+			});
+			drawButton.addEventListener("click", draw);
+			allLeadersButton.addEventListener("click", drawAllLeaders);
+			stage.addEventListener("click", (event) => {
+				const button = event.target.closest(".leader-button");
+				if (button) drawLeader(Number(button.dataset.groupIndex));
+			});
+			document.getElementById("resetButton").addEventListener("click", resetDraws);
+			document.getElementById("clearHistoryButton").addEventListener("click", resetDraws);
+
+			updateSummary();
+			renderHistory();
+		})();
+	</script>
+</body>
+</html>
